@@ -1,1 +1,3 @@
 # simple_gps_sdr
+
+ First principles and barebones signal processing from raw voltage. Intended to act as a playground for GPS reflectometry and studies of ionospheric effects. For now, just L1 C/A code based. There are no plans to include navigation message decoding at this point. Maybe later... 
