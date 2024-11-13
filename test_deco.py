@@ -22,7 +22,7 @@ def lpf(fc=0.8e6,sr=10e6,N=500):
 
 
 # 10 MHz sample-rate data in complex64
-f=open("signal_source.dat","rb")
+f=open("test_data.dat","rb")
 # usrp capture
 #f=open("usrp.dat","rb")
 #f=open("airspy2.dat","rb")
@@ -45,6 +45,7 @@ n_sats=GCM.shape[0]
 
 # read and discard garbage from the start
 z=n.fromfile(f,count=n_samples,dtype=n.complex64)
+print(len(z))
 
 w=lpf()
 W=s.fft.fft(w,n_samples)
@@ -139,12 +140,18 @@ while True:
         print("PRN %d C/N %1.2f (dB-Hz) dop %1.2f delay %d"%(ci,10.0*n.log10( (1000/n_coh)*(MFI[ci,dopi,deli]-nfloor[dopi])/nfloor[dopi]),dops[dopi],deli))
 
         fo.write("%1.2f %1.2f %d "%(10.0*n.log10((1000/n_coh)*(MFI[ci,dopi,deli]-nfloor[dopi])/nfloor[dopi]),dops[dopi],deli))
-        if False:
+        if True:
+            plt.figure(figsize=(16,9))
             plt.imshow(10.0*n.log10( (1e3*MFI[ci,::-1,:]-nfloor[::-1,None])/nfloor[::-1,None]),aspect="auto",extent=[0,code_lengthi,n.min(dops),n.max(dops)])
+            cb=plt.colorbar()
+            cb.set_label("C/N (dB-Hz)")
             plt.xlabel(r"Delay (0.1 $\mu$s samples)")
             plt.ylabel(r"Doppler (Hz)")
-            plt.title(ci)
-            plt.show()
+            plt.title("PRN %d"%(ci+1))
+            plt.tight_layout()
+            plt.savefig("prn-mf-%03d.png"%(ci))
+            plt.close()
+#            plt.show()
     fo.write("\n")
     fo.flush()
     t1=time.time()
