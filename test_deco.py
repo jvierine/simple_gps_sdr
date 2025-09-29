@@ -5,17 +5,14 @@ import scipy.signal.windows as sw
 import scipy as s
 import os
 
-def reduce_max(arr, N):
-    # Trim length so it's divisible by N
-    L = arr.shape[0] - (arr.shape[0] % N)
-    arr = arr[:L]
 
-    # Reshape to group along time axis
-    new_shape = (L // N, N) + arr.shape[1:]
-    arr_reshaped = arr.reshape(new_shape)
-
-    # Take max along the chunk axis
-    return arr_reshaped.max(axis=1)
+def reduce_max(arr,N):
+    len2=int(arr.shape[1]/N)
+    A2=n.zeros([arr.shape[0],len2])
+    idx=n.arange(len2)*N
+    for i in range(len2):
+        A2[:,i]=n.max(arr[:,(i*N):(i*N+N)],axis=1)
+    return(A2)
 #
 # Cold start GPS satellite detector.
 # Find doppler, prn, and delay of all 32 satellites in the constellation
@@ -172,31 +169,33 @@ while True:
     # the doppler can be used to determine the line of sight velocity between the satellite and
     # the receiver
     for ci in range(n_sats):
-        dopi,deli=n.unravel_index(n.argmax(MFI[ci,:,:]/nfloor[:,None]),MFI[ci,:,:].shape)
-        peak_cn=10.0*n.log10( (1000)*(MFI[ci,dopi,deli]-nfloor[dopi])/nfloor[dopi])
+
+        snr=(1e3*MFI[ci,:,:]-nfloor[:,None])/nfloor[:,None]
+
+        dopi,deli=n.unravel_index(n.argmax(snr),snr.shape)
+        peak_cn=10.0*n.log10( snr[dopi,deli])
         print("PRN %d C/N %1.2f (dB-Hz) dop %1.2f delay %d"%(ci,peak_cn,dops[dopi],deli))
 
-        fo.write("%1.2f %1.2f %d "%(10.0*n.log10((1000)*(MFI[ci,dopi,deli]-nfloor[dopi])/nfloor[dopi]),dops[dopi],deli))
-        if True:
-            plt.figure(figsize=(16,9))
-            # the code has 1 kHz bandwidth. Normalize the power by the noise floor to get C/N0 in dB-Hz
-            snr=(1e3*MFI[ci,::-1,:]-nfloor[::-1,None])/nfloor[::-1,None]
-            #dop_est,tau_est=n.unravel_index(n.argmax(snr.flatten()),snr.shape)
-            # to make plots smaller, decimate the delay axis by a factor of dec
-            # take maximum of each 10 samples in time
-            snr_dec = reduce_max(snr, N=10)
-            plt.imshow(10.0*n.log10( snr_dec ) ,aspect="auto",extent=[0,code_lengthi/10,n.min(dops),n.max(dops)])
-            cb=plt.colorbar()
-            plt.title(r"PRN %d C/N %1.0f (dB) delay %d $\mu$s doppler %1.2f km/s"%(ci+1,peak_cn,deli/10,dops[dopi]))
-            plt.plot(deli/10,dops[dopi],"x",color="red")
-            cb.set_label("C/N (dB-Hz)")
-            plt.xlabel(r"Delay (1 $\mu$s samples)")
-            plt.ylabel(r"Doppler (Hz)")
-            #plt.title("PRN %d"%(ci+1))
-            plt.tight_layout()
-            print("saving prn-mf-%03d"%(ci))
-            plt.savefig("prn-mf-%03d.png"%(ci))
-            plt.close()
+        # plot snr
+        plt.figure(figsize=(16,9))
+        # the code has 1 kHz bandwidth. Normalize the power by the noise floor to get C/N0 in dB-Hz
+        #dop_est,tau_est=n.unravel_index(n.argmax(snr.flatten()),snr.shape)
+        # to make plots smaller, decimate the delay axis by a factor of dec
+        # take maximum of each 10 samples in time
+        snr_dec = reduce_max(snr, N=10)
+        plt.imshow(10.0*n.log10( snr_dec[::-1,:] ) ,aspect="auto",extent=[0,code_lengthi/10,n.min(dops),n.max(dops)])
+        cb=plt.colorbar()
+        plt.title(r"PRN %d C/N %1.1f (dB) delay %d $\mu$s doppler %1.2f km/s"%(ci+1,peak_cn,deli/10,dops[dopi]))
+        plt.plot(deli/10,dops[dopi],"x",color="red")
+        cb.set_label("C/N (dB-Hz)")
+        plt.xlabel(r"Delay (1 $\mu$s samples)")
+        plt.ylabel(r"Doppler (Hz)")
+        #plt.title("PRN %d"%(ci+1))
+        plt.tight_layout()
+        print("saving prn-mf-%03d"%(ci))
+        plt.savefig("prn-mf-%03d.png"%(ci))
+        plt.close()
+
     fo.write("\n")
     fo.flush()
     t1=time.time()
