@@ -107,6 +107,12 @@ def interp(code,sr=10e6):
     return(code[idx])
 
 def get_gps_codes(n_samples,n_coh=1):
+    """
+    Get all 32 GPS C/A codes, repeated n_coh times and FFT'd
+    n_coh=1 is one code cycle. this is recommended if you do not know the exact timing
+    n_coh>1 is recommended if you know the code timing to improve SNR
+    FFT is perfomed, as the codes will be convolved in frequency domain
+    """
     sats=[]
     GCM=n.zeros([32,n_samples],dtype=n.complex64)
     for i in range(32):
@@ -124,5 +130,10 @@ def get_gps_codes(n_samples,n_coh=1):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
     code=PRN(14)
+    
+    plt.plot(code)
+    plt.title("GPS code %d"%(14))
+    plt.show()
     print(len(code))
