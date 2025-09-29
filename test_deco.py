@@ -20,13 +20,12 @@ def reduce_max(arr, N):
 # Cold start GPS satellite detector.
 # Find doppler, prn, and delay of all 32 satellites in the constellation
 #
-
 # this is the sample-rate that the receiver is running at
 sr=10e6
-# this is how the delay is decimated
+# this is how the delay is decimated. we don't need super high resolution delay to start with
 dec=10
 
-# low pass filter for digital signal
+# low pass filter for digital signal (signal processing course)
 def lpf(fc=0.8e6,sr=10e6,N=500):
     om0 = 2*n.pi*fc/sr
     m=n.arange(-N,N)+1e-6
@@ -106,6 +105,8 @@ while True:
 
     # remove DC 
     z=z-n.mean(z)
+    # inverse weight average based on noise power
+    wgt=1/n.sum(n.abs(z)**2.0)
     
     if notch_spikes:
         # remove RFI that is narrow in frequency domain
@@ -154,7 +155,7 @@ while True:
         CC=s.fft.ifft(ZDC[None,:]*GCM,axis=1,workers=os.cpu_count())
 
         # power
-        PWR=n.real(CC*n.conj(CC))
+        PWR=n.real(CC*n.conj(CC))*wgt
 
         # incoherently integrate N repetitions of the code
         for ri in range(n_reps):
@@ -172,22 +173,26 @@ while True:
     # the receiver
     for ci in range(n_sats):
         dopi,deli=n.unravel_index(n.argmax(MFI[ci,:,:]/nfloor[:,None]),MFI[ci,:,:].shape)
-        print("PRN %d C/N %1.2f (dB-Hz) dop %1.2f delay %d"%(ci,10.0*n.log10( (1000)*(MFI[ci,dopi,deli]-nfloor[dopi])/nfloor[dopi]),dops[dopi],deli))
+        peak_cn=10.0*n.log10( (1000)*(MFI[ci,dopi,deli]-nfloor[dopi])/nfloor[dopi])
+        print("PRN %d C/N %1.2f (dB-Hz) dop %1.2f delay %d"%(ci,peak_cn,dops[dopi],deli))
 
         fo.write("%1.2f %1.2f %d "%(10.0*n.log10((1000)*(MFI[ci,dopi,deli]-nfloor[dopi])/nfloor[dopi]),dops[dopi],deli))
         if True:
             plt.figure(figsize=(16,9))
             # the code has 1 kHz bandwidth. Normalize the power by the noise floor to get C/N0 in dB-Hz
             snr=(1e3*MFI[ci,::-1,:]-nfloor[::-1,None])/nfloor[::-1,None]
+            #dop_est,tau_est=n.unravel_index(n.argmax(snr.flatten()),snr.shape)
             # to make plots smaller, decimate the delay axis by a factor of dec
             # take maximum of each 10 samples in time
             snr_dec = reduce_max(snr, N=10)
             plt.imshow(10.0*n.log10( snr_dec ) ,aspect="auto",extent=[0,code_lengthi/10,n.min(dops),n.max(dops)])
             cb=plt.colorbar()
+            plt.title(r"PRN %d C/N %1.0f (dB) delay %d $\mu$s doppler %1.2f km/s"%(ci+1,peak_cn,deli/10,dops[dopi]))
+            plt.plot(deli/10,dops[dopi],"x",color="red")
             cb.set_label("C/N (dB-Hz)")
             plt.xlabel(r"Delay (1 $\mu$s samples)")
             plt.ylabel(r"Doppler (Hz)")
-            plt.title("PRN %d"%(ci+1))
+            #plt.title("PRN %d"%(ci+1))
             plt.tight_layout()
             print("saving prn-mf-%03d"%(ci))
             plt.savefig("prn-mf-%03d.png"%(ci))
